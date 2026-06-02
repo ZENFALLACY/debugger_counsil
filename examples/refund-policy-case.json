@@ -1,0 +1,7 @@
+{
+  "user_question": "What is the refund window?",
+  "system_prompt": "Answer only from the provided policy context. If unsure, say it is not available.",
+  "context_text": "Refunds are available within 7 days of purchase when the customer has a receipt.",
+  "ai_answer": "Customers can request a refund within 30 days of purchase.",
+  "expected_answer": "Customers can request a refund within 7 days of purchase with a receipt."
+}
