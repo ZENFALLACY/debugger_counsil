@@ -1,33 +1,36 @@
 {
   "report": {
-    "case_summary": "Mock diagnosis for a document-grounded AI answer. The app received the question, prompt, context, and model answer successfully.",
-    "council_summary": "Phase 1 mock council: evidence, reasoning, prompt, and fix judges are represented as placeholder output only.",
+    "case_summary": "Extracted 1 factual claim(s) from the AI answer and checked them against the supplied context.",
+    "council_summary": "Phase 2 local council: deterministic claim extraction and rule checks are active. External AI judges are still disabled.",
     "scores": {
-      "hallucination": 42,
+      "hallucination": 100,
       "reasoning": 74,
-      "citation_support": 58,
+      "citation_support": 0,
       "instruction_following": 81
     },
-    "supported_claims": [
+    "extracted_claims": [
       {
-        "claim": "The answer attempts to respond to the submitted user question.",
-        "status": "supported",
-        "evidence": "Request fields were present and non-empty."
+        "id": "claim-1",
+        "text": "Customers can request a refund within 30 days of purchase"
       }
     ],
-    "unsupported_claims": [
+    "supported_claims": [],
+    "unsupported_claims": [],
+    "contradicted_claims": [
       {
-        "claim": "Some answer details may not be grounded in the supplied context.",
-        "status": "needs_review",
-        "evidence": "Phase 1 uses a mock report and does not run claim extraction yet."
+        "claim_id": "claim-1",
+        "claim": "Customers can request a refund within 30 days of purchase",
+        "status": "contradicted",
+        "evidence": "Refunds are available within 7 days of purchase when the customer has a receipt",
+        "explanation": "The claim overlaps with the context, but a number or date differs from the closest evidence sentence."
       }
     ],
-    "likely_root_cause": "Evidence verification is not implemented yet. The next phase should add rule checks and model judges before treating scores as real.",
+    "likely_root_cause": "At least one claim appears contradicted by the context, likely due to the answer using a conflicting fact.",
     "confidence": "mock",
     "recommended_fixes": [
       "Add a context-only instruction to the system prompt.",
       "Require citations or short evidence snippets for factual claims.",
-      "Add rule-based support checks before enabling external judge APIs."
+      "Review unsupported and contradicted claims before enabling external judge APIs."
     ],
     "notes": "Expected answer was provided, so a future judge can compare against it."
   }

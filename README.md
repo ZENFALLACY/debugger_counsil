@@ -2,7 +2,7 @@
 
 An AI evaluation platform that acts like a council of expert reviewers for AI-generated responses.
 
-AI Diagnosis Council helps developers understand what failed in an AI response, why it failed, and what should be improved. Phase 1 is a local full-stack MVP that accepts an evaluation case and returns a mock diagnosis council report without calling any external AI APIs.
+AI Diagnosis Council helps developers understand what failed in an AI response, why it failed, and what should be improved. The current MVP accepts an evaluation case, extracts simple factual claims, checks them against supplied context, and returns a deterministic diagnosis council report without calling any external AI APIs.
 
 ## Project Vision
 
@@ -24,7 +24,7 @@ That is not enough for teams building real AI products. Developers also need to 
 - Was the problem caused by retrieval, prompt design, reasoning, or missing context?
 - What should change before the system is shipped?
 
-Phase 1 focuses on the first product surface: submitting a single AI response and receiving a structured mock diagnosis report.
+The current MVP focuses on the first product surface: submitting a single AI response and receiving a structured local diagnosis report.
 
 ## Why AI Diagnosis Council Exists
 
@@ -40,7 +40,7 @@ AI Diagnosis Council exists to make those failures easier to inspect. The produc
 - Root-cause diagnosis
 - Recommended fixes
 
-Phase 1 does not implement real judges yet. It establishes the app structure, evaluation form, backend contract, and mock report shape.
+The current implementation does not use real LLM judges yet. It establishes the app structure, evaluation form, backend contract, claim extraction, and rule-checking foundation.
 
 ## Phase 1 Goals
 
@@ -65,25 +65,46 @@ Not included:
 - Judge APIs
 - Production deployment
 
+## Phase 2 Goals
+
+Phase 2 adds the first deterministic backend intelligence layer.
+
+Included:
+
+- Simple claim extraction from AI answers
+- Basic rule checker for context support
+- Supported, unsupported, and contradicted claim labels
+- Evidence snippets when a matching context sentence is found
+- Number/date mismatch detection for obvious contradictions
+- Backend tests for claim and rule behavior
+
+Still not included:
+
+- OpenAI API integration
+- Gemini API integration
+- Authentication
+- Persistence
+- Embeddings or vector search
+
 ## Architecture Overview
 
 ```text
 User
-│
-▼
+|
+v
 Next.js Frontend
-│
-▼
+|
+v
 FastAPI Backend
-│
-▼
-Mock Diagnosis Engine
-│
-▼
+|
+v
+Claim Extractor + Rule Checker
+|
+v
 Council Report
 ```
 
-The frontend collects an evaluation case from the user. The backend validates the request and returns deterministic mock report data shaped like a future AI Diagnosis Council evaluation.
+The frontend collects an evaluation case from the user. The backend validates the request, extracts simple factual claims from the AI answer, checks them against the provided context, and returns deterministic report data shaped like a future AI Diagnosis Council evaluation.
 
 ## Folder Structure
 
@@ -112,6 +133,14 @@ Health check:
 curl http://localhost:8000/health
 ```
 
+Run backend tests:
+
+```bash
+cd backend
+.venv\Scripts\activate
+pytest
+```
+
 ## Frontend Setup
 
 ```bash
@@ -136,7 +165,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 4. Submit the sample refund-policy case from `examples/sample-request.json`.
 5. Review the mock diagnosis council report in the dashboard panel.
 
-The report is currently deterministic mock data so the app can run locally before judge integrations are added.
+The report is deterministic local data based on simple Python claim extraction and rule checks. External judge integrations are intentionally disabled.
 
 ## API Documentation
 
@@ -154,7 +183,7 @@ Example response:
 }
 ```
 
-### Create Mock Diagnosis Report
+### Create Local Diagnosis Report
 
 ```text
 POST /api/evaluations/mock-diagnosis
@@ -179,21 +208,23 @@ Sample files:
 
 ## Mock Report Structure
 
-The mock report is designed to resemble the future council output while remaining deterministic in Phase 1.
+The report is designed to resemble the future council output while remaining deterministic in the local MVP.
 
 ```json
 {
   "report": {
     "case_summary": "Mock diagnosis for a document-grounded AI answer.",
-    "council_summary": "Phase 1 mock council output.",
+    "council_summary": "Phase 2 local council output.",
     "scores": {
       "hallucination": 42,
       "reasoning": 74,
       "citation_support": 58,
       "instruction_following": 81
     },
+    "extracted_claims": [],
     "supported_claims": [],
     "unsupported_claims": [],
+    "contradicted_claims": [],
     "likely_root_cause": "Evidence verification is not implemented yet.",
     "confidence": "mock",
     "recommended_fixes": [],
@@ -207,8 +238,10 @@ Report fields:
 - `case_summary`: short overview of the submitted evaluation case
 - `council_summary`: mock council-style interpretation of the review
 - `scores`: placeholder quality scores for future evaluation dimensions
+- `extracted_claims`: simple factual claims split from the AI answer
 - `supported_claims`: placeholder list of claims considered supported
 - `unsupported_claims`: placeholder list of claims needing review
+- `contradicted_claims`: claims with obvious number/date mismatches against context
 - `likely_root_cause`: mock explanation of the likely issue
 - `confidence`: currently set to `mock`
 - `recommended_fixes`: placeholder improvement suggestions
@@ -218,8 +251,9 @@ Report fields:
 
 - Frontend: Next.js, React, TypeScript
 - Backend: FastAPI, Python, Pydantic
+- Tests: pytest
 - Development: local frontend and backend servers
-- Data: mock JSON only
+- Data: deterministic local logic and mock JSON only
 
 ## Future Roadmap
 
@@ -230,17 +264,23 @@ Report fields:
 
 ### Phase 2
 
+- Claim extraction
+- Basic rule checker
+- Deterministic supported, unsupported, and contradicted labels
+
+### Phase 3
+
 - OpenAI integration
 - Gemini integration
 - Judge-based evaluation
 
-### Phase 3
+### Phase 4
 
 - Evaluation history
 - Authentication
 - Persistence
 
-### Phase 4
+### Phase 5
 
 - Multi-agent diagnosis council
 - Benchmarking system
@@ -258,10 +298,10 @@ Placeholder: mock council report screenshot
 
 ## Contributing
 
-This project is in early Phase 1 development. Contributions should stay aligned with the current scope:
+This project is in early MVP development. Contributions should stay aligned with the current scope:
 
 - Keep the app runnable locally.
-- Use mock data only.
+- Use deterministic local logic only.
 - Do not add external AI APIs yet.
 - Do not add authentication or persistence yet.
 - Prefer small, focused changes that improve the MVP foundation.
@@ -272,7 +312,7 @@ Suggested contribution areas:
 - Better sample cases in `examples/`
 - Documentation improvements
 - Backend response contract cleanup
-- Phase 1 test coverage
+- Phase 2 test coverage
 
 ## License
 

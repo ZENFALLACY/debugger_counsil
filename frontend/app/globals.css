@@ -270,6 +270,8 @@ button.secondary {
 
 .claim-row small,
 .note {
+  display: block;
+  margin-top: 4px;
   color: var(--muted);
 }
 

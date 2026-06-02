@@ -1,4 +1,4 @@
-  "use client";
+"use client";
 
 import { FormEvent, useMemo, useState } from "react";
 
@@ -11,9 +11,16 @@ type EvaluationForm = {
 };
 
 type ClaimAssessment = {
+  claim_id: string;
   claim: string;
   status: string;
-  evidence: string;
+  evidence: string | null;
+  explanation: string;
+};
+
+type ExtractedClaim = {
+  id: string;
+  text: string;
 };
 
 type DiagnosisReport = {
@@ -25,8 +32,10 @@ type DiagnosisReport = {
     citation_support: number;
     instruction_following: number;
   };
+  extracted_claims: ExtractedClaim[];
   supported_claims: ClaimAssessment[];
   unsupported_claims: ClaimAssessment[];
+  contradicted_claims: ClaimAssessment[];
   likely_root_cause: string;
   confidence: string;
   recommended_fixes: string[];
@@ -143,7 +152,7 @@ export default function Home() {
               <strong>12</strong>
             </div>
             <div>
-              <span>Mock reports</span>
+              <span>Rule checks</span>
               <strong>12</strong>
             </div>
             <div>
@@ -204,8 +213,8 @@ export default function Home() {
             <p className="eyebrow">Mock report</p>
             <h2>Waiting for an evaluation case</h2>
             <p>
-              The backend will return deterministic scores, claim placeholders,
-              root cause notes, and recommended fixes.
+              The backend will return deterministic scores, extracted claims,
+              root cause notes, and recommended fixes from local rules.
             </p>
           </div>
         )}
@@ -231,17 +240,41 @@ function ReportView({ report }: { report: DiagnosisReport }) {
       </div>
 
       <section>
+        <h3>Extracted claims</h3>
+        {report.extracted_claims.length > 0 ? (
+          report.extracted_claims.map((claim) => (
+            <div key={claim.id} className="claim-row">
+              <span>{claim.id}</span>
+              <p>{claim.text}</p>
+            </div>
+          ))
+        ) : (
+          <p>No factual claims were extracted from the AI answer.</p>
+        )}
+      </section>
+
+      <section>
         <h3>Supported claims</h3>
-        {report.supported_claims.map((claim) => (
-          <ClaimRow key={claim.claim} claim={claim} />
-        ))}
+        <ClaimList
+          claims={report.supported_claims}
+          emptyText="No supported claims."
+        />
       </section>
 
       <section>
         <h3>Unsupported or unverified claims</h3>
-        {report.unsupported_claims.map((claim) => (
-          <ClaimRow key={claim.claim} claim={claim} />
-        ))}
+        <ClaimList
+          claims={report.unsupported_claims}
+          emptyText="No unsupported claims."
+        />
+      </section>
+
+      <section>
+        <h3>Contradicted claims</h3>
+        <ClaimList
+          claims={report.contradicted_claims}
+          emptyText="No contradicted claims."
+        />
       </section>
 
       <section>
@@ -265,12 +298,27 @@ function ReportView({ report }: { report: DiagnosisReport }) {
   );
 }
 
+function ClaimList({
+  claims,
+  emptyText,
+}: {
+  claims: ClaimAssessment[];
+  emptyText: string;
+}) {
+  if (claims.length === 0) {
+    return <p>{emptyText}</p>;
+  }
+
+  return claims.map((claim) => <ClaimRow key={claim.claim_id} claim={claim} />);
+}
+
 function ClaimRow({ claim }: { claim: ClaimAssessment }) {
   return (
     <div className="claim-row">
       <span>{claim.status}</span>
       <p>{claim.claim}</p>
-      <small>{claim.evidence}</small>
+      <small>{claim.evidence ?? "No evidence snippet found."}</small>
+      <small>{claim.explanation}</small>
     </div>
   );
 }
