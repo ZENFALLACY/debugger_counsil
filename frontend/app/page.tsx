@@ -10,6 +10,8 @@ type EvaluationForm = {
   expected_answer: string;
 };
 
+type DiagnosisMode = "fast" | "council";
+
 type ClaimAssessment = {
   claim_id: string;
   claim: string;
@@ -95,6 +97,7 @@ const fields: Array<{
 
 export default function Home() {
   const [form, setForm] = useState<EvaluationForm>(initialForm);
+  const [diagnosisMode, setDiagnosisMode] = useState<DiagnosisMode>("fast");
   const [report, setReport] = useState<DiagnosisReport | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +113,11 @@ export default function Home() {
     setError(null);
 
     try {
-      const response = await fetch(`${apiUrl}/api/evaluations/mock-diagnosis`, {
+      const endpoint =
+        diagnosisMode === "fast"
+          ? "/api/evaluations/mock-diagnosis"
+          : "/api/evaluations/openai-diagnosis";
+      const response = await fetch(`${apiUrl}${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -122,7 +129,8 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`Backend returned ${response.status}`);
+        const errorMessage = await readApiError(response);
+        throw new Error(errorMessage);
       }
 
       const data = (await response.json()) as { report: DiagnosisReport };
@@ -168,6 +176,50 @@ export default function Home() {
         </div>
 
         <form className="evaluation-form" onSubmit={handleSubmit}>
+          <fieldset className="depth-selector">
+            <legend>Diagnosis Depth</legend>
+            <label
+              className={diagnosisMode === "fast" ? "depth-option active" : "depth-option"}
+            >
+              <input
+                type="radio"
+                name="diagnosis-depth"
+                value="fast"
+                checked={diagnosisMode === "fast"}
+                onChange={() => {
+                  setDiagnosisMode("fast");
+                  setReport(null);
+                  setError(null);
+                }}
+              />
+              <span>
+                <strong>Fast Diagnosis</strong>
+                <small>Local Evidence Engine only</small>
+              </span>
+            </label>
+            <label
+              className={
+                diagnosisMode === "council" ? "depth-option active" : "depth-option"
+              }
+            >
+              <input
+                type="radio"
+                name="diagnosis-depth"
+                value="council"
+                checked={diagnosisMode === "council"}
+                onChange={() => {
+                  setDiagnosisMode("council");
+                  setReport(null);
+                  setError(null);
+                }}
+              />
+              <span>
+                <strong>Council Diagnosis</strong>
+                <small>Local evidence + OpenAI judge + aggregator</small>
+              </span>
+            </label>
+          </fieldset>
+
           {fields.map((field) => (
             <label key={field.name} className="field">
               <span>
@@ -191,7 +243,9 @@ export default function Home() {
 
           <div className="form-actions">
             <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Generating..." : "Generate mock report"}
+              {isSubmitting
+                ? `Running ${diagnosisMode === "fast" ? "fast" : "council"} diagnosis...`
+                : `Run ${diagnosisMode === "fast" ? "Fast" : "Council"} Diagnosis`}
             </button>
             <button
               type="button"
@@ -207,19 +261,27 @@ export default function Home() {
           </div>
 
           {error ? <p className="error">Backend error: {error}</p> : null}
+          {diagnosisMode === "council" ? (
+            <p className="mode-note">
+              Council Diagnosis requires `OPENAI_API_KEY` on the FastAPI backend.
+            </p>
+          ) : null}
         </form>
       </section>
 
       <aside className="report-panel">
         {report ? (
-          <ReportView report={report} />
+          <ReportView report={report} mode={diagnosisMode} />
         ) : (
           <div className="empty-report">
-            <p className="eyebrow">Mock report</p>
+            <p className="eyebrow">
+              {diagnosisMode === "fast" ? "Fast Diagnosis" : "Council Diagnosis"}
+            </p>
             <h2>Waiting for an evaluation case</h2>
             <p>
-              The backend will return deterministic scores, extracted claims,
-              root cause notes, and recommended fixes from local rules.
+              {diagnosisMode === "fast"
+                ? "Input flows through the Local Evidence Engine and returns a local evidence report."
+                : "Input flows through the Local Evidence Engine, OpenAI judge, and aggregator for a final council report."}
             </p>
           </div>
         )}
@@ -228,10 +290,32 @@ export default function Home() {
   );
 }
 
-function ReportView({ report }: { report: DiagnosisReport }) {
+async function readApiError(response: Response): Promise<string> {
+  try {
+    const data = (await response.json()) as { detail?: string };
+    if (data.detail) {
+      if (data.detail.includes("OPENAI_API_KEY")) {
+        return "OPENAI_API_KEY is missing on the backend. Add it to backend/.env or your shell, then restart FastAPI.";
+      }
+      return data.detail;
+    }
+  } catch {
+  }
+  return `Backend returned ${response.status}`;
+}
+
+function ReportView({
+  report,
+  mode,
+}: {
+  report: DiagnosisReport;
+  mode: DiagnosisMode;
+}) {
+  const isCouncil = mode === "council";
+
   return (
     <div className="report">
-      <p className="eyebrow">Diagnosis report</p>
+      <p className="eyebrow">{isCouncil ? "Council Diagnosis" : "Fast Diagnosis"}</p>
       <h2>{report.case_summary}</h2>
       <p>{report.council_summary}</p>
 
@@ -243,6 +327,14 @@ function ReportView({ report }: { report: DiagnosisReport }) {
           </div>
         ))}
       </div>
+
+      <section>
+        <h3>Local evidence findings</h3>
+        <p>
+          The local engine extracts claims, finds the closest context evidence,
+          and labels each claim before any optional judge review.
+        </p>
+      </section>
 
       <section>
         <h3>Extracted claims</h3>
@@ -290,8 +382,23 @@ function ReportView({ report }: { report: DiagnosisReport }) {
         />
       </section>
 
+      {isCouncil ? (
+        <section>
+          <h3>OpenAI judge findings</h3>
+          <p>
+            OpenAI reviewed the original input together with extracted claims and
+            local claim-level verdicts. The judge supplied the final numeric
+            scores, confidence, root-cause assessment, and recommended fixes.
+          </p>
+          <div className="judge-summary">
+            <span>Confidence</span>
+            <strong>{report.confidence}</strong>
+          </div>
+        </section>
+      ) : null}
+
       <section>
-        <h3>Likely root cause</h3>
+        <h3>{isCouncil ? "Final aggregated diagnosis" : "Likely root cause"}</h3>
         <p>{report.likely_root_cause}</p>
       </section>
 

@@ -98,6 +98,53 @@ h3 {
   max-width: 860px;
 }
 
+.depth-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.depth-selector legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+
+.depth-option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  padding: 14px;
+}
+
+.depth-option.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(19, 111, 99, 0.1);
+}
+
+.depth-option input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.depth-option span {
+  display: grid;
+  gap: 4px;
+}
+
+.depth-option small,
+.mode-note {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .dashboard-mockup {
   display: grid;
   gap: 10px;
@@ -240,6 +287,25 @@ button.secondary {
   font-size: 1.8rem;
 }
 
+.judge-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.judge-summary span {
+  color: var(--muted);
+}
+
+.judge-summary strong {
+  font-size: 1.4rem;
+}
+
 .report section {
   border-top: 1px solid var(--border);
   padding-top: 18px;
@@ -294,6 +360,10 @@ button.secondary {
   .landing {
     grid-template-columns: 1fr;
     max-width: 860px;
+  }
+
+  .depth-selector {
+    grid-template-columns: 1fr;
   }
 
   .workspace,

@@ -125,6 +125,26 @@ Still not included:
 - Database or authentication
 - Embeddings
 
+## Phase 4 Goals
+
+Phase 4 connects the frontend to both diagnosis depths.
+
+Included:
+
+- Diagnosis Depth selector in the UI
+- Fast Diagnosis mode using the local diagnosis endpoint
+- Council Diagnosis mode using the OpenAI diagnosis endpoint
+- Clear loading states
+- Clear missing `OPENAI_API_KEY` error messaging
+- Report sections for local evidence findings, OpenAI judge findings, final diagnosis, confidence, and score breakdown
+
+Still not included:
+
+- Gemini integration
+- Authentication
+- Persistence
+- Embeddings
+
 ## Architecture Overview
 
 ```text
@@ -229,7 +249,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 2. Start the frontend.
 3. Open `http://localhost:3000`.
 4. Submit the sample refund-policy case from `examples/sample-request.json`.
-5. Review the mock diagnosis council report in the dashboard panel.
+5. Choose `Fast Diagnosis` for local evidence only, or `Council Diagnosis` for local evidence plus OpenAI judge review.
+6. Review the diagnosis report in the dashboard panel.
 
 The mock report is deterministic local data based on simple Python claim extraction and rule checks. The OpenAI endpoint uses the same local checks first, then sends the evaluation case to OpenAI for a strict JSON judge response.
 
@@ -448,17 +469,18 @@ Completed so far:
 - Phase 2: claim extraction and deterministic rule checker
 - Phase 3: OpenAI judge endpoint with strict JSON parsing
 - Phase 3.5: normalized rule checker and explainable local scoring
+- Phase 4: frontend diagnosis-depth selector for Fast and Council Diagnosis
 
 Planned next:
 
-### Phase 4
+### Phase 5
 
 - Gemini integration
 - Evaluation history
 - Authentication
 - Persistence
 
-### Phase 5
+### Phase 6
 
 - Multi-agent diagnosis council
 - Benchmarking system
