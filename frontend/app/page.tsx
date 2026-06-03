@@ -37,7 +37,7 @@ type DiagnosisReport = {
   unsupported_claims: ClaimAssessment[];
   contradicted_claims: ClaimAssessment[];
   likely_root_cause: string;
-  confidence: string;
+  confidence: string | number;
   recommended_fixes: string[];
   notes: string;
 };

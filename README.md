@@ -2,7 +2,7 @@
 
 An AI evaluation platform that acts like a council of expert reviewers for AI-generated responses.
 
-AI Diagnosis Council helps developers understand what failed in an AI response, why it failed, and what should be improved. The current MVP accepts an evaluation case, extracts simple factual claims, checks them against supplied context, and returns a deterministic diagnosis council report without calling any external AI APIs.
+AI Diagnosis Council helps developers understand what failed in an AI response, why it failed, and what should be improved. The current MVP accepts an evaluation case, extracts simple factual claims, checks them against supplied context, and can optionally call an OpenAI judge for a structured diagnosis report.
 
 ## Project Vision
 
@@ -40,7 +40,7 @@ AI Diagnosis Council exists to make those failures easier to inspect. The produc
 - Root-cause diagnosis
 - Recommended fixes
 
-The current implementation does not use real LLM judges yet. It establishes the app structure, evaluation form, backend contract, claim extraction, and rule-checking foundation.
+The current implementation establishes the app structure, evaluation form, backend contract, claim extraction, rule-checking foundation, and a first OpenAI judge integration.
 
 ## Phase 1 Goals
 
@@ -86,6 +86,26 @@ Still not included:
 - Persistence
 - Embeddings or vector search
 
+## Phase 3 Goals
+
+Phase 3 adds the first external judge integration while keeping the rest of the system simple.
+
+Included:
+
+- OpenAI judge endpoint
+- Strict JSON response parsing
+- Aggregator that combines deterministic rule checks with OpenAI judge output
+- Clear error when `OPENAI_API_KEY` is missing
+- Mocked tests for OpenAI judge behavior
+
+Still not included:
+
+- Gemini integration
+- Authentication
+- Persistence
+- Embeddings
+- Production monitoring
+
 ## Architecture Overview
 
 ```text
@@ -101,10 +121,13 @@ v
 Claim Extractor + Rule Checker
 |
 v
+OpenAI Judge + Aggregator
+|
+v
 Council Report
 ```
 
-The frontend collects an evaluation case from the user. The backend validates the request, extracts simple factual claims from the AI answer, checks them against the provided context, and returns deterministic report data shaped like a future AI Diagnosis Council evaluation.
+The frontend collects an evaluation case from the user. The backend validates the request, extracts simple factual claims from the AI answer, checks them against the provided context, and can either return a local deterministic report or combine those rule results with an OpenAI judge response.
 
 ## Folder Structure
 
@@ -141,6 +164,30 @@ cd backend
 pytest
 ```
 
+### OpenAI API Key
+
+The mock endpoint does not require an API key. The OpenAI diagnosis endpoint requires `OPENAI_API_KEY`.
+
+Create `backend/.env` or set the variable in your shell:
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+```
+
+PowerShell example:
+
+```powershell
+$env:OPENAI_API_KEY="your_api_key_here"
+```
+
+Optional model override:
+
+```bash
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Do not commit real API keys. Keep secrets in local environment variables only.
+
 ## Frontend Setup
 
 ```bash
@@ -165,7 +212,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 4. Submit the sample refund-policy case from `examples/sample-request.json`.
 5. Review the mock diagnosis council report in the dashboard panel.
 
-The report is deterministic local data based on simple Python claim extraction and rule checks. External judge integrations are intentionally disabled.
+The mock report is deterministic local data based on simple Python claim extraction and rule checks. The OpenAI endpoint uses the same local checks first, then sends the evaluation case to OpenAI for a strict JSON judge response.
 
 ## API Documentation
 
@@ -205,6 +252,62 @@ Sample files:
 
 - `examples/sample-request.json`
 - `examples/sample-response.json`
+
+### Create OpenAI Diagnosis Report
+
+```text
+POST /api/evaluations/openai-diagnosis
+```
+
+This endpoint requires `OPENAI_API_KEY`.
+
+It sends the following inputs to the OpenAI judge:
+
+- user question
+- system prompt
+- context
+- AI answer
+- extracted claims
+- rule-checker results
+
+Example request:
+
+```json
+{
+  "user_question": "What is the refund window?",
+  "system_prompt": "Answer only from the provided policy context. If unsure, say it is not available.",
+  "context_text": "Refunds are available within 7 days of purchase when the customer has a receipt.",
+  "ai_answer": "Customers can request a refund within 30 days of purchase.",
+  "expected_answer": "Customers can request a refund within 7 days of purchase with a receipt."
+}
+```
+
+Example response shape:
+
+```json
+{
+  "report": {
+    "case_summary": "Extracted 1 factual claim(s), checked them with deterministic rules, and reviewed the case with OpenAI judge.",
+    "council_summary": "Phase 3 council: local claim/rule checks are combined with one OpenAI judge response. Gemini and other judges are not enabled yet.",
+    "scores": {
+      "hallucination": 95,
+      "reasoning": 70,
+      "citation_support": 5,
+      "instruction_following": 80
+    },
+    "extracted_claims": [],
+    "supported_claims": [],
+    "unsupported_claims": [],
+    "contradicted_claims": [],
+    "likely_root_cause": "The answer used a conflicting refund window.",
+    "confidence": 92,
+    "recommended_fixes": ["Use the refund window from the context."],
+    "notes": "Expected answer was provided. Rule checker summary: 0 supported, 0 unsupported, 1 contradicted."
+  }
+}
+```
+
+If `OPENAI_API_KEY` is missing, the endpoint returns a clear error instead of attempting a request.
 
 ## Mock Report Structure
 
@@ -247,10 +350,29 @@ Report fields:
 - `recommended_fixes`: placeholder improvement suggestions
 - `notes`: additional context about the submitted case
 
+## OpenAI Judge JSON Contract
+
+The OpenAI judge is instructed to return strict JSON only:
+
+```json
+{
+  "hallucination_score": 0,
+  "reasoning_score": 0,
+  "citation_support_score": 0,
+  "instruction_following_score": 0,
+  "likely_root_cause": "string",
+  "recommended_fixes": ["string"],
+  "confidence": 0
+}
+```
+
+The backend parses and validates this response before aggregation. Invalid JSON is handled safely and returned as an API error.
+
 ## Tech Stack
 
 - Frontend: Next.js, React, TypeScript
 - Backend: FastAPI, Python, Pydantic
+- AI judge: OpenAI Python SDK
 - Tests: pytest
 - Development: local frontend and backend servers
 - Data: deterministic local logic and mock JSON only
@@ -271,11 +393,12 @@ Report fields:
 ### Phase 3
 
 - OpenAI integration
-- Gemini integration
 - Judge-based evaluation
+- Strict JSON aggregation
 
 ### Phase 4
 
+- Gemini integration
 - Evaluation history
 - Authentication
 - Persistence

@@ -1,7 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.aggregator import aggregate_openai_report
 from app.claims import extract_claims
+from app.judges.openai_judge import (
+    OpenAIJudgeConfigError,
+    OpenAIJudgeResponseError,
+    run_openai_judge,
+)
 from app.rules import check_claims_against_context
 from app.schemas import (
     DiagnosisReport,
@@ -29,8 +35,7 @@ def health() -> dict[str, str]:
 
 @app.post("/api/evaluations/mock-diagnosis", response_model=EvaluationResponse)
 def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
-    claims = extract_claims(payload.ai_answer)
-    assessments = check_claims_against_context(payload.context_text, claims)
+    claims, assessments = _run_local_pipeline(payload)
     supported_claims = [
         assessment for assessment in assessments if assessment.status == "supported"
     ]
@@ -83,6 +88,30 @@ def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
     )
 
     return EvaluationResponse(report=report)
+
+
+@app.post("/api/evaluations/openai-diagnosis", response_model=EvaluationResponse)
+def create_openai_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
+    claims, assessments = _run_local_pipeline(payload)
+
+    try:
+        judge_result = run_openai_judge(payload, claims, assessments)
+    except OpenAIJudgeConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OpenAIJudgeResponseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return EvaluationResponse(
+        report=aggregate_openai_report(payload, claims, assessments, judge_result)
+    )
+
+
+def _run_local_pipeline(
+    payload: EvaluationRequest,
+):
+    claims = extract_claims(payload.ai_answer)
+    assessments = check_claims_against_context(payload.context_text, claims)
+    return claims, assessments
 
 
 def _support_score(total_claims: int, supported_count: int) -> int:

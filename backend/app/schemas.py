@@ -29,6 +29,16 @@ class Scorecard(BaseModel):
     instruction_following: int
 
 
+class OpenAIJudgeResult(BaseModel):
+    hallucination_score: int = Field(..., ge=0, le=100)
+    reasoning_score: int = Field(..., ge=0, le=100)
+    citation_support_score: int = Field(..., ge=0, le=100)
+    instruction_following_score: int = Field(..., ge=0, le=100)
+    likely_root_cause: str
+    recommended_fixes: list[str]
+    confidence: int = Field(..., ge=0, le=100)
+
+
 class DiagnosisReport(BaseModel):
     case_summary: str
     council_summary: str
@@ -38,7 +48,7 @@ class DiagnosisReport(BaseModel):
     unsupported_claims: list[ClaimAssessment]
     contradicted_claims: list[ClaimAssessment]
     likely_root_cause: str
-    confidence: str
+    confidence: int | str
     recommended_fixes: list[str]
     notes: str
 
