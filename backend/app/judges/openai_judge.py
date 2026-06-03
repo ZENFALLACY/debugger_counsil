@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from pydantic import ValidationError
 
 from app.judges.prompts import OPENAI_JUDGE_SYSTEM_PROMPT, build_openai_judge_prompt
@@ -66,24 +66,27 @@ def run_openai_judge(
         )
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=30.0)
     prompt = build_openai_judge_prompt(payload, extracted_claims, rule_checker_results)
 
-    response = client.responses.create(
-        model=model,
-        input=[
-            {"role": "system", "content": OPENAI_JUDGE_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "ai_diagnosis_council_openai_judge",
-                "strict": True,
-                "schema": OPENAI_JUDGE_SCHEMA,
-            }
-        },
-    )
+    try:
+        response = client.responses.create(
+            model=model,
+            input=[
+                {"role": "system", "content": OPENAI_JUDGE_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "ai_diagnosis_council_openai_judge",
+                    "strict": True,
+                    "schema": OPENAI_JUDGE_SCHEMA,
+                }
+            },
+        )
+    except OpenAIError as exc:
+        raise OpenAIJudgeResponseError(f"OpenAI request failed: {exc}") from exc
 
     return parse_openai_judge_json(response.output_text)
 
