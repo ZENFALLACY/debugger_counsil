@@ -6,6 +6,7 @@ from app.schemas import (
     OpenAIJudgeResult,
     Scorecard,
 )
+from app.scoring import calculate_local_scores
 
 
 def aggregate_openai_report(
@@ -27,6 +28,12 @@ def aggregate_openai_report(
         for assessment in rule_checker_results
         if assessment.status == "contradicted"
     ]
+    unverifiable_claims = [
+        assessment
+        for assessment in rule_checker_results
+        if assessment.status == "unverifiable"
+    ]
+    _, score_breakdown = calculate_local_scores(payload, rule_checker_results)
 
     return DiagnosisReport(
         case_summary=(
@@ -47,10 +54,12 @@ def aggregate_openai_report(
         supported_claims=supported_claims,
         unsupported_claims=unsupported_claims,
         contradicted_claims=contradicted_claims,
+        unverifiable_claims=unverifiable_claims,
         likely_root_cause=judge_result.likely_root_cause,
         confidence=judge_result.confidence,
         recommended_fixes=judge_result.recommended_fixes,
         notes=_notes(payload, supported_claims, unsupported_claims, contradicted_claims),
+        score_breakdown=score_breakdown,
     )
 
 

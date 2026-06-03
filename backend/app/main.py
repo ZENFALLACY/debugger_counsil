@@ -9,11 +9,11 @@ from app.judges.openai_judge import (
     run_openai_judge,
 )
 from app.rules import check_claims_against_context
+from app.scoring import calculate_local_scores
 from app.schemas import (
     DiagnosisReport,
     EvaluationRequest,
     EvaluationResponse,
-    Scorecard,
 )
 
 
@@ -45,6 +45,9 @@ def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
     contradicted_claims = [
         assessment for assessment in assessments if assessment.status == "contradicted"
     ]
+    unverifiable_claims = [
+        assessment for assessment in assessments if assessment.status == "unverifiable"
+    ]
 
     expected_note = (
         "Expected answer was provided, so a future judge can compare against it."
@@ -55,6 +58,7 @@ def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
     supported_count = len(supported_claims)
     contradicted_count = len(contradicted_claims)
     unsupported_count = len(unsupported_claims)
+    local_scores, score_breakdown = calculate_local_scores(payload, assessments)
 
     report = DiagnosisReport(
         case_summary=(
@@ -62,21 +66,17 @@ def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
             "checked them against the supplied context."
         ),
         council_summary=(
-            "Phase 2 local council: deterministic claim extraction and rule checks "
-            "are active. External AI judges are still disabled."
+            "Phase 3.5 local council: normalized rule checks and explainable "
+            "claim-level scoring are active. External AI judges are still optional."
         ),
-        scores=Scorecard(
-            hallucination=_hallucination_score(total_claims, unsupported_count, contradicted_count),
-            reasoning=74,
-            citation_support=_support_score(total_claims, supported_count),
-            instruction_following=81,
-        ),
+        scores=local_scores,
         extracted_claims=claims,
         supported_claims=supported_claims,
         unsupported_claims=unsupported_claims,
         contradicted_claims=contradicted_claims,
+        unverifiable_claims=unverifiable_claims,
         likely_root_cause=(
-            _root_cause(unsupported_count, contradicted_count)
+            _root_cause(unsupported_count, contradicted_count, len(unverifiable_claims))
         ),
         confidence="mock",
         recommended_fixes=[
@@ -85,6 +85,7 @@ def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
             "Review unsupported and contradicted claims before enabling external judge APIs.",
         ],
         notes=expected_note,
+        score_breakdown=score_breakdown,
     )
 
     return EvaluationResponse(report=report)
@@ -114,27 +115,16 @@ def _run_local_pipeline(
     return claims, assessments
 
 
-def _support_score(total_claims: int, supported_count: int) -> int:
-    if total_claims == 0:
-        return 0
-    return round((supported_count / total_claims) * 100)
-
-
-def _hallucination_score(
-    total_claims: int, unsupported_count: int, contradicted_count: int
-) -> int:
-    if total_claims == 0:
-        return 0
-    risky_claims = unsupported_count + contradicted_count
-    return round((risky_claims / total_claims) * 100)
-
-
-def _root_cause(unsupported_count: int, contradicted_count: int) -> str:
+def _root_cause(
+    unsupported_count: int, contradicted_count: int, unverifiable_count: int
+) -> str:
     if contradicted_count:
         return (
             "At least one claim appears contradicted by the context, likely due to "
             "the answer using a conflicting fact."
         )
+    if unverifiable_count:
+        return "At least one claim is unverifiable because no evidence context was available."
     if unsupported_count:
         return (
             "At least one claim could not be verified from the context, likely due "

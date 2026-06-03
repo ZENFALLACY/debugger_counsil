@@ -106,6 +106,25 @@ Still not included:
 - Embeddings
 - Production monitoring
 
+## Phase 3.5 Goals
+
+Phase 3.5 upgrades the local evidence engine so scores are explainable at the claim level.
+
+Included:
+
+- Synonym and phrase normalization
+- Evidence sentence extraction from context
+- Supported, unsupported, contradicted, and unverifiable verdicts
+- Claim-level confidence, matched terms, and mismatched values
+- Weighted local scoring with a score breakdown
+
+Still not included:
+
+- New external APIs
+- Gemini integration
+- Database or authentication
+- Embeddings
+
 ## Architecture Overview
 
 ```text
@@ -299,10 +318,26 @@ Example response shape:
     "supported_claims": [],
     "unsupported_claims": [],
     "contradicted_claims": [],
+    "unverifiable_claims": [],
     "likely_root_cause": "The answer used a conflicting refund window.",
     "confidence": 92,
     "recommended_fixes": ["Use the refund window from the context."],
-    "notes": "Expected answer was provided. Rule checker summary: 0 supported, 0 unsupported, 1 contradicted."
+    "notes": "Expected answer was provided. Rule checker summary: 0 supported, 0 unsupported, 1 contradicted.",
+    "score_breakdown": {
+      "total_claims": 1,
+      "supported": 0,
+      "unsupported": 0,
+      "contradicted": 1,
+      "unverifiable": 0,
+      "risk_weights": {
+        "supported": 0,
+        "unsupported": 60,
+        "contradicted": 100,
+        "unverifiable": 70
+      },
+      "hallucination_formula": "average claim risk",
+      "hallucination_score": 100
+    }
   }
 }
 ```
@@ -317,7 +352,7 @@ The report is designed to resemble the future council output while remaining det
 {
   "report": {
     "case_summary": "Mock diagnosis for a document-grounded AI answer.",
-    "council_summary": "Phase 2 local council output.",
+    "council_summary": "Phase 3.5 local council output.",
     "scores": {
       "hallucination": 42,
       "reasoning": 74,
@@ -328,10 +363,12 @@ The report is designed to resemble the future council output while remaining det
     "supported_claims": [],
     "unsupported_claims": [],
     "contradicted_claims": [],
+    "unverifiable_claims": [],
     "likely_root_cause": "Evidence verification is not implemented yet.",
     "confidence": "mock",
     "recommended_fixes": [],
-    "notes": "Expected answer was provided."
+    "notes": "Expected answer was provided.",
+    "score_breakdown": {}
   }
 }
 ```
@@ -345,10 +382,36 @@ Report fields:
 - `supported_claims`: placeholder list of claims considered supported
 - `unsupported_claims`: placeholder list of claims needing review
 - `contradicted_claims`: claims with obvious number/date mismatches against context
+- `unverifiable_claims`: claims that cannot be checked because no context exists
 - `likely_root_cause`: mock explanation of the likely issue
 - `confidence`: currently set to `mock`
 - `recommended_fixes`: placeholder improvement suggestions
 - `notes`: additional context about the submitted case
+- `score_breakdown`: local scoring counts, risk weights, and formula details
+
+## Local Scoring Logic
+
+The local scoring system is deterministic and claim-level.
+
+Risk weights:
+
+```text
+supported = 0
+unsupported = 60
+contradicted = 100
+unverifiable = 70
+```
+
+Scores:
+
+```text
+hallucination_score = average claim risk
+citation_support_score = supported_claims / total_claims * 100
+reasoning_score = 100 if all supported, 70 if unsupported exists, 40 if contradicted exists
+instruction_following_score = 95 if all supported, 60 if context-only prompt has unsupported claims, 50 if no context exists
+```
+
+The report includes `score_breakdown` so reviewers can inspect how local scores were produced.
 
 ## OpenAI Judge JSON Contract
 
@@ -379,22 +442,14 @@ The backend parses and validates this response before aggregation. Invalid JSON 
 
 ## Future Roadmap
 
-### Phase 1
+Completed so far:
 
-- Mock diagnosis system
-- Local full-stack MVP
+- Phase 1: local full-stack MVP
+- Phase 2: claim extraction and deterministic rule checker
+- Phase 3: OpenAI judge endpoint with strict JSON parsing
+- Phase 3.5: normalized rule checker and explainable local scoring
 
-### Phase 2
-
-- Claim extraction
-- Basic rule checker
-- Deterministic supported, unsupported, and contradicted labels
-
-### Phase 3
-
-- OpenAI integration
-- Judge-based evaluation
-- Strict JSON aggregation
+Planned next:
 
 ### Phase 4
 
@@ -411,12 +466,13 @@ The backend parses and validates this response before aggregation. Invalid JSON 
 
 ## Screenshots
 
-Screenshots will be added after the Phase 1 UI is finalized.
+Screenshots will be added after the MVP UI is finalized.
 
 ```text
 Placeholder: landing page screenshot
 Placeholder: evaluation form screenshot
-Placeholder: mock council report screenshot
+Placeholder: local diagnosis report screenshot
+Placeholder: OpenAI diagnosis report screenshot
 ```
 
 ## Contributing
@@ -424,8 +480,8 @@ Placeholder: mock council report screenshot
 This project is in early MVP development. Contributions should stay aligned with the current scope:
 
 - Keep the app runnable locally.
-- Use deterministic local logic only.
-- Do not add external AI APIs yet.
+- Keep deterministic local logic available as the baseline.
+- Do not add new external AI APIs without a focused phase plan.
 - Do not add authentication or persistence yet.
 - Prefer small, focused changes that improve the MVP foundation.
 
@@ -435,7 +491,7 @@ Suggested contribution areas:
 - Better sample cases in `examples/`
 - Documentation improvements
 - Backend response contract cleanup
-- Phase 2 test coverage
+- Rule-checker and scoring test coverage
 
 ## License
 

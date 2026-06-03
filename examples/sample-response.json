@@ -1,7 +1,7 @@
 {
   "report": {
     "case_summary": "Extracted 1 factual claim(s) from the AI answer and checked them against the supplied context.",
-    "council_summary": "Phase 2 local council: deterministic claim extraction and rule checks are active. External AI judges are still disabled.",
+    "council_summary": "Phase 3.5 local council: normalized rule checks and explainable claim-level scoring are active. External AI judges are still optional.",
     "scores": {
       "hallucination": 100,
       "reasoning": 74,
@@ -22,9 +22,13 @@
         "claim": "Customers can request a refund within 30 days of purchase",
         "status": "contradicted",
         "evidence": "Refunds are available within 7 days of purchase when the customer has a receipt",
-        "explanation": "The claim overlaps with the context, but a number or date differs from the closest evidence sentence."
+        "explanation": "The claim matches the context topic, but normalized numbers or dates conflict with the closest evidence sentence.",
+        "confidence": 97,
+        "matched_terms": ["customer", "day", "purchase", "refund"],
+        "mismatched_values": ["30", "7"]
       }
     ],
+    "unverifiable_claims": [],
     "likely_root_cause": "At least one claim appears contradicted by the context, likely due to the answer using a conflicting fact.",
     "confidence": "mock",
     "recommended_fixes": [
@@ -32,6 +36,21 @@
       "Require citations or short evidence snippets for factual claims.",
       "Review unsupported and contradicted claims before enabling external judge APIs."
     ],
-    "notes": "Expected answer was provided, so a future judge can compare against it."
+    "notes": "Expected answer was provided, so a future judge can compare against it.",
+    "score_breakdown": {
+      "total_claims": 1,
+      "supported": 0,
+      "unsupported": 0,
+      "contradicted": 1,
+      "unverifiable": 0,
+      "risk_weights": {
+        "supported": 0,
+        "unsupported": 60,
+        "contradicted": 100,
+        "unverifiable": 70
+      },
+      "hallucination_formula": "average claim risk",
+      "hallucination_score": 100
+    }
   }
 }

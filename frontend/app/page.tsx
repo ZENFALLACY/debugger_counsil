@@ -16,6 +16,9 @@ type ClaimAssessment = {
   status: string;
   evidence: string | null;
   explanation: string;
+  confidence: number;
+  matched_terms: string[];
+  mismatched_values: string[];
 };
 
 type ExtractedClaim = {
@@ -36,10 +39,12 @@ type DiagnosisReport = {
   supported_claims: ClaimAssessment[];
   unsupported_claims: ClaimAssessment[];
   contradicted_claims: ClaimAssessment[];
+  unverifiable_claims: ClaimAssessment[];
   likely_root_cause: string;
   confidence: string | number;
   recommended_fixes: string[];
   notes: string;
+  score_breakdown: Record<string, unknown>;
 };
 
 const initialForm: EvaluationForm = {
@@ -278,6 +283,14 @@ function ReportView({ report }: { report: DiagnosisReport }) {
       </section>
 
       <section>
+        <h3>Unverifiable claims</h3>
+        <ClaimList
+          claims={report.unverifiable_claims}
+          emptyText="No unverifiable claims."
+        />
+      </section>
+
+      <section>
         <h3>Likely root cause</h3>
         <p>{report.likely_root_cause}</p>
       </section>
@@ -294,6 +307,13 @@ function ReportView({ report }: { report: DiagnosisReport }) {
       <p className="note">
         Confidence: {report.confidence}. {report.notes}
       </p>
+
+      <section>
+        <h3>Score breakdown</h3>
+        <pre className="score-breakdown">
+          {JSON.stringify(report.score_breakdown, null, 2)}
+        </pre>
+      </section>
     </div>
   );
 }
@@ -319,6 +339,13 @@ function ClaimRow({ claim }: { claim: ClaimAssessment }) {
       <p>{claim.claim}</p>
       <small>{claim.evidence ?? "No evidence snippet found."}</small>
       <small>{claim.explanation}</small>
+      <small>Confidence: {claim.confidence}</small>
+      {claim.matched_terms.length > 0 ? (
+        <small>Matched terms: {claim.matched_terms.join(", ")}</small>
+      ) : null}
+      {claim.mismatched_values.length > 0 ? (
+        <small>Mismatched values: {claim.mismatched_values.join(", ")}</small>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import re
 
+from app.normalization import extract_numbers, normalize_text
 from app.schemas import ClaimAssessment, ExtractedClaim
 
 
@@ -26,6 +27,7 @@ STOP_WORDS = {
     "that",
     "the",
     "to",
+    "up",
     "was",
     "were",
     "will",
@@ -38,7 +40,6 @@ def check_claims_against_context(
     context: str, claims: list[ExtractedClaim]
 ) -> list[ClaimAssessment]:
     context_sentences = _split_sentences(context)
-
     return [_assess_claim(context_sentences, claim) for claim in claims]
 
 
@@ -49,51 +50,51 @@ def _assess_claim(
         return ClaimAssessment(
             claim_id=claim.id,
             claim=claim.text,
-            status="unsupported",
+            status="unverifiable",
             evidence=None,
-            explanation="No context was provided, so the claim cannot be verified.",
+            explanation="No context was provided, so the claim is unverifiable.",
+            confidence=100,
         )
 
     claim_tokens = _keywords(claim.text)
-    best_sentence = ""
-    best_score = 0
+    best_sentence, matched_terms = _find_best_evidence(context_sentences, claim_tokens)
 
-    for sentence in context_sentences:
-        sentence_tokens = _keywords(sentence)
-        score = len(claim_tokens.intersection(sentence_tokens))
-        if score > best_score:
-            best_sentence = sentence
-            best_score = score
-
-    if not best_sentence or best_score == 0:
+    if not best_sentence or not matched_terms:
         return ClaimAssessment(
             claim_id=claim.id,
             claim=claim.text,
             status="unsupported",
             evidence=None,
-            explanation="No meaningful keyword match was found in the context.",
+            explanation="No meaningful normalized term match was found in the context.",
+            confidence=85,
         )
 
-    if _has_number_or_date_mismatch(claim.text, best_sentence):
+    mismatched_values = _mismatched_values(claim.text, best_sentence)
+    if mismatched_values:
         return ClaimAssessment(
             claim_id=claim.id,
             claim=claim.text,
             status="contradicted",
             evidence=best_sentence,
             explanation=(
-                "The claim overlaps with the context, but a number or date differs "
-                "from the closest evidence sentence."
+                "The claim matches the context topic, but normalized numbers or dates "
+                "conflict with the closest evidence sentence."
             ),
+            confidence=_confidence(claim_tokens, matched_terms, base=82),
+            matched_terms=matched_terms,
+            mismatched_values=mismatched_values,
         )
 
-    coverage = best_score / max(len(claim_tokens), 1)
-    if _normalized(claim.text) in _normalized(best_sentence) or coverage >= 0.55:
+    coverage = len(matched_terms) / max(len(claim_tokens), 1)
+    if _normalized_contains(claim.text, best_sentence) or coverage >= 0.5:
         return ClaimAssessment(
             claim_id=claim.id,
             claim=claim.text,
             status="supported",
             evidence=best_sentence,
-            explanation="The claim has strong keyword overlap with the context.",
+            explanation="The claim is supported by a normalized match in the context.",
+            confidence=_confidence(claim_tokens, matched_terms, base=75),
+            matched_terms=matched_terms,
         )
 
     return ClaimAssessment(
@@ -102,10 +103,28 @@ def _assess_claim(
         status="unsupported",
         evidence=best_sentence,
         explanation=(
-            "Some related context was found, but there is not enough overlap to "
-            "mark the claim as supported."
+            "Related context was found, but there is not enough normalized overlap "
+            "to mark the claim as supported."
         ),
+        confidence=_confidence(claim_tokens, matched_terms, base=55),
+        matched_terms=matched_terms,
     )
+
+
+def _find_best_evidence(
+    context_sentences: list[str], claim_tokens: set[str]
+) -> tuple[str, list[str]]:
+    best_sentence = ""
+    best_terms: list[str] = []
+
+    for sentence in context_sentences:
+        sentence_tokens = _keywords(sentence)
+        matched_terms = sorted(claim_tokens.intersection(sentence_tokens))
+        if len(matched_terms) > len(best_terms):
+            best_sentence = sentence
+            best_terms = matched_terms
+
+    return best_sentence, best_terms
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -114,40 +133,30 @@ def _split_sentences(text: str) -> list[str]:
 
 
 def _keywords(text: str) -> set[str]:
-    words = re.findall(r"[a-zA-Z0-9]+", text.lower())
+    words = normalize_text(text).split()
     return {
-        _normalize_word(word)
+        word
         for word in words
-        if word not in STOP_WORDS and len(word) > 1
+        if word not in STOP_WORDS and (len(word) > 1 or word.isdigit())
     }
 
 
-def _normalize_word(word: str) -> str:
-    if word.endswith("ies") and len(word) > 4:
-        return f"{word[:-3]}y"
-    if word.endswith("s") and not word.endswith("ss") and len(word) > 3:
-        return word[:-1]
-    return word
+def _normalized_contains(claim_text: str, evidence_text: str) -> bool:
+    return normalize_text(claim_text) in normalize_text(evidence_text)
 
 
-def _normalized(text: str) -> str:
-    return " ".join(re.findall(r"[a-zA-Z0-9]+", text.lower()))
-
-
-def _has_number_or_date_mismatch(claim_text: str, evidence_text: str) -> bool:
-    claim_values = set(_extract_numbers_and_dates(claim_text))
-    evidence_values = set(_extract_numbers_and_dates(evidence_text))
+def _mismatched_values(claim_text: str, evidence_text: str) -> list[str]:
+    claim_values = set(extract_numbers(claim_text))
+    evidence_values = set(extract_numbers(evidence_text))
     if not claim_values or not evidence_values:
-        return False
+        return []
+    if not _keywords(claim_text).intersection(_keywords(evidence_text)):
+        return []
+    if claim_values.intersection(evidence_values):
+        return []
+    return sorted(claim_values.union(evidence_values))
 
-    shared_subject = _keywords(claim_text).intersection(_keywords(evidence_text))
-    return bool(shared_subject) and claim_values.isdisjoint(evidence_values)
 
-
-def _extract_numbers_and_dates(text: str) -> list[str]:
-    values = re.findall(r"\b\d{1,4}(?:[-/]\d{1,2}(?:[-/]\d{1,4})?)?\b", text)
-    month_dates = re.findall(
-        r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}\b",
-        text.lower(),
-    )
-    return values + month_dates
+def _confidence(claim_tokens: set[str], matched_terms: list[str], base: int) -> int:
+    coverage = len(matched_terms) / max(len(claim_tokens), 1)
+    return min(100, round(base + (coverage * 25)))
