@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.aggregator import aggregate_openai_report
 from app.claims import extract_claims
+from app.fix_engine import generate_fix_recommendations
 from app.judges.openai_judge import (
     OpenAIJudgeConfigError,
     OpenAIJudgeResponseError,
@@ -43,6 +44,8 @@ def health() -> dict[str, str]:
 @app.post("/api/evaluations/mock-diagnosis", response_model=EvaluationResponse)
 def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
     claims, assessments = _run_local_pipeline(payload)
+    fix_result = generate_fix_recommendations(assessments)
+    assessments = fix_result.assessments
     supported_claims = [
         assessment for assessment in assessments if assessment.status == "supported"
     ]
@@ -85,12 +88,15 @@ def create_mock_diagnosis(payload: EvaluationRequest) -> EvaluationResponse:
         likely_root_cause=(
             _root_cause(unsupported_count, contradicted_count, len(unverifiable_claims))
         ),
+        overall_root_cause=fix_result.overall_root_cause,
         confidence="mock",
         recommended_fixes=[
             "Add a context-only instruction to the system prompt.",
             "Require citations or short evidence snippets for factual claims.",
             "Review unsupported and contradicted claims before enabling external judge APIs.",
         ],
+        overall_fix_recommendations=fix_result.overall_fix_recommendations,
+        corrected_answer_draft=fix_result.corrected_answer_draft,
         notes=expected_note,
         score_breakdown=score_breakdown,
     )

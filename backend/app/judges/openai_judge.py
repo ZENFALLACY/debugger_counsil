@@ -66,7 +66,7 @@ def run_openai_judge(
         )
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-    client = OpenAI(api_key=api_key, timeout=30.0)
+    client = OpenAI(api_key=api_key)
     prompt = build_openai_judge_prompt(payload, extracted_claims, rule_checker_results)
 
     try:
@@ -84,6 +84,7 @@ def run_openai_judge(
                     "schema": OPENAI_JUDGE_SCHEMA,
                 }
             },
+            timeout=30.0,
         )
     except OpenAIError as exc:
         raise OpenAIJudgeResponseError(f"OpenAI request failed: {exc}") from exc

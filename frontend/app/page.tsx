@@ -21,6 +21,9 @@ type ClaimAssessment = {
   confidence: number;
   matched_terms: string[];
   mismatched_values: string[];
+  root_cause: string;
+  fix_suggestion: string;
+  corrected_claim: string;
 };
 
 type ExtractedClaim = {
@@ -43,8 +46,11 @@ type DiagnosisReport = {
   contradicted_claims: ClaimAssessment[];
   unverifiable_claims: ClaimAssessment[];
   likely_root_cause: string;
+  overall_root_cause: string;
   confidence: string | number;
   recommended_fixes: string[];
+  overall_fix_recommendations: string[];
+  corrected_answer_draft: string;
   notes: string;
   score_breakdown: Record<string, unknown>;
 };
@@ -403,12 +409,25 @@ function ReportView({
       </section>
 
       <section>
+        <h3>Root Cause</h3>
+        <p>{report.overall_root_cause || report.likely_root_cause}</p>
+      </section>
+
+      <section>
         <h3>Recommended fixes</h3>
         <ul>
-          {report.recommended_fixes.map((fix) => (
+          {(report.overall_fix_recommendations.length > 0
+            ? report.overall_fix_recommendations
+            : report.recommended_fixes
+          ).map((fix) => (
             <li key={fix}>{fix}</li>
           ))}
         </ul>
+      </section>
+
+      <section>
+        <h3>Corrected Answer Draft</h3>
+        <p>{report.corrected_answer_draft}</p>
       </section>
 
       <p className="note">
@@ -452,6 +471,13 @@ function ClaimRow({ claim }: { claim: ClaimAssessment }) {
       ) : null}
       {claim.mismatched_values.length > 0 ? (
         <small>Mismatched values: {claim.mismatched_values.join(", ")}</small>
+      ) : null}
+      {claim.root_cause ? <small>Root Cause: {claim.root_cause}</small> : null}
+      {claim.fix_suggestion ? (
+        <small>Fix Suggestion: {claim.fix_suggestion}</small>
+      ) : null}
+      {claim.corrected_claim ? (
+        <small>Corrected Claim: {claim.corrected_claim}</small>
       ) : null}
     </div>
   );
