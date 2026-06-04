@@ -7,6 +7,7 @@ from app.schemas import (
     Scorecard,
 )
 from app.scoring import calculate_local_scores
+from app.fix_engine import generate_fix_recommendations
 
 
 def aggregate_openai_report(
@@ -15,6 +16,8 @@ def aggregate_openai_report(
     rule_checker_results: list[ClaimAssessment],
     judge_result: OpenAIJudgeResult,
 ) -> DiagnosisReport:
+    fix_result = generate_fix_recommendations(rule_checker_results)
+    rule_checker_results = fix_result.assessments
     supported_claims = [
         assessment for assessment in rule_checker_results if assessment.status == "supported"
     ]
@@ -56,8 +59,17 @@ def aggregate_openai_report(
         contradicted_claims=contradicted_claims,
         unverifiable_claims=unverifiable_claims,
         likely_root_cause=judge_result.likely_root_cause,
+        overall_root_cause=(
+            f"{judge_result.likely_root_cause} Local repair analysis: "
+            f"{fix_result.overall_root_cause}"
+        ),
         confidence=judge_result.confidence,
         recommended_fixes=judge_result.recommended_fixes,
+        overall_fix_recommendations=[
+            *judge_result.recommended_fixes,
+            *fix_result.overall_fix_recommendations,
+        ],
+        corrected_answer_draft=fix_result.corrected_answer_draft,
         notes=_notes(payload, supported_claims, unsupported_claims, contradicted_claims),
         score_breakdown=score_breakdown,
     )

@@ -23,6 +23,9 @@ class ClaimAssessment(BaseModel):
     confidence: int = Field(default=0, ge=0, le=100)
     matched_terms: list[str] = Field(default_factory=list)
     mismatched_values: list[str] = Field(default_factory=list)
+    root_cause: str = ""
+    fix_suggestion: str = ""
+    corrected_claim: str = ""
 
 
 class Scorecard(BaseModel):
@@ -52,8 +55,11 @@ class DiagnosisReport(BaseModel):
     contradicted_claims: list[ClaimAssessment]
     unverifiable_claims: list[ClaimAssessment] = Field(default_factory=list)
     likely_root_cause: str
+    overall_root_cause: str = ""
     confidence: int | str
     recommended_fixes: list[str]
+    overall_fix_recommendations: list[str] = Field(default_factory=list)
+    corrected_answer_draft: str = ""
     notes: str
     score_breakdown: dict[str, object] = Field(default_factory=dict)
 
